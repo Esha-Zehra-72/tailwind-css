@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@layer components {
+  .card {
+    @apply bg-green-700 w-80 p-[50px] rounded-lg mx-auto mt-[80px] hover:bg-red-700 hover:shadow-2xl hover:text-[#fff] dark:bg-black dark:text-white
+  }
+}
+
+/* @utility flex-center{
+  @apply text-indigo-800 text-[67px] font-bold
+} */
+
+
+@theme {
+  --color-garbig: #782F29;
+}
+
+@layer base {
+  h1 {
+    @apply text-7xl
+  }
+}
