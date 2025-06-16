@@ -10,8 +10,7 @@ const Map = () => {
     const userMarkerRef = useRef(null);
     const searchInputRef = useRef(null);
     const routeLayerRef = useRef(null);
-    const markersRef = useRef([]); 
-
+    const markersRef = useRef([]);
     const [userPosition, setUserPosition] = useLocalStorage("USER_MARKER", null);
     const [nearMarkers, setNearMarkers] = useLocalStorage("NEAR_MARKER", []);
     const [searchQuery, setSearchQuery] = useState('');
@@ -23,9 +22,15 @@ const Map = () => {
     const [endSearchQuery, setEndSearchQuery] = useState('');
     const [startSearchResults, setStartSearchResults] = useState([]);
     const [endSearchResults, setEndSearchResults] = useState([]);
-    const [locationError, setLocationError] = useState(null);
 
-    const location = useGeolocation();
+    const { position: location, error: locationError, isLoading: isLocationLoading } = useGeolocation();
+
+    const userIcon = leaflet.divIcon({
+        className: 'user-location-marker',
+        html: '<div class="user-location-pulse"></div>',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+    });
 
     const clearMarkers = () => {
         markersRef.current.forEach(marker => {
@@ -35,6 +40,34 @@ const Map = () => {
         });
         markersRef.current = userMarkerRef.current ? [userMarkerRef.current] : [];
         setNearMarkers([]);
+    };
+
+    const centerOnCurrentLocation = () => {
+        if (!mapInstanceRef.current) return;
+
+        if (location) {
+            mapInstanceRef.current.flyTo([location.latitude, location.longitude], 15);
+            updateUserMarker(location.latitude, location.longitude);
+        } else if (userPosition) {
+            mapInstanceRef.current.flyTo([userPosition.latitude, userPosition.longitude], 15);
+            updateUserMarker(userPosition.latitude, userPosition.longitude);
+        } else {
+            mapInstanceRef.current.flyTo([31.448877, 74.204068], 15);
+            updateUserMarker(31.448877, 74.204068);
+        }
+    };
+
+    const updateUserMarker = (lat, lng) => {
+        if (userMarkerRef.current) {
+            mapInstanceRef.current.removeLayer(userMarkerRef.current);
+        }
+        userMarkerRef.current = leaflet.marker([lat, lng], {
+            icon: userIcon,
+            zIndexOffset: 1000
+        })
+            .addTo(mapInstanceRef.current)
+            .bindPopup("You are here")
+            .openPopup();
     };
 
     const handleSearch = async (e) => {
@@ -65,7 +98,6 @@ const Map = () => {
                 const lon = parseFloat(firstResult.lon);
 
                 mapInstanceRef.current.setView([lat, lon], 13);
-
                 clearMarkers();
 
                 const newMarker = leaflet.marker([lat, lon])
@@ -132,14 +164,15 @@ const Map = () => {
                         opacity: 0.7
                     }
                 }).addTo(mapInstanceRef.current);
-                
-              const startMarker = leaflet.marker([startLocation.latitude, startLocation.longitude])
-    .addTo(mapInstanceRef.current)
-    .bindPopup(`<b>Start:</b> ${startLocation.display_name ? startLocation.display_name : `Lat: ${startLocation.latitude.toFixed(4)}, Lon: ${startLocation.longitude.toFixed(4)}`}`);
 
-const endMarker = leaflet.marker([endLocation.latitude, endLocation.longitude])
-    .addTo(mapInstanceRef.current)
-    .bindPopup(`<b>End:</b> ${endLocation.display_name ? endLocation.display_name : `Lat: ${endLocation.latitude.toFixed(4)}, Lon: ${endLocation.longitude.toFixed(4)}`}`);
+                const startMarker = leaflet.marker([startLocation.latitude, startLocation.longitude])
+                    .addTo(mapInstanceRef.current)
+                    .bindPopup(`<b>Start:</b> ${startLocation.display_name ? startLocation.display_name : `Lat: ${startLocation.latitude.toFixed(4)}, Lon: ${startLocation.longitude.toFixed(4)}`}`);
+
+                const endMarker = leaflet.marker([endLocation.latitude, endLocation.longitude])
+                    .addTo(mapInstanceRef.current)
+                    .bindPopup(`<b>End:</b> ${endLocation.display_name ? endLocation.display_name : `Lat: ${endLocation.latitude.toFixed(4)}, Lon: ${endLocation.longitude.toFixed(4)}`}`);
+
                 markersRef.current.push(startMarker, endMarker);
 
                 const bounds = leaflet.latLngBounds(routeCoordinates);
@@ -152,11 +185,9 @@ const endMarker = leaflet.marker([endLocation.latitude, endLocation.longitude])
 
     useEffect(() => {
         if (mapInstanceRef.current) return;
-        
-        // Initialize map with a reasonable default view
         mapInstanceRef.current = leaflet.map(mapContainerRef.current).setView(
-            [20, 0],  // Default to a more central location
-            2         // Low zoom level to show more of the world
+            [31.448877, 74.204068],
+            15
         );
 
         leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -200,37 +231,13 @@ const endMarker = leaflet.marker([endLocation.latitude, endLocation.longitude])
     }, []);
 
     useEffect(() => {
-        if (!mapInstanceRef.current || !location) return;
-
-        setUserPosition({
-            latitude: location.latitude,
-            longitude: location.longitude
-        });
-
-        // Remove existing user marker if it exists
-        if (userMarkerRef.current) {
-            mapInstanceRef.current.removeLayer(userMarkerRef.current);
+        if (location) {
+            setUserPosition({
+                latitude: location.latitude,
+                longitude: location.longitude
+            });
+            updateUserMarker(location.latitude, location.longitude);
         }
-
-        // Create new user marker
-        userMarkerRef.current = leaflet.marker([location.latitude, location.longitude])
-            .addTo(mapInstanceRef.current)
-            .bindPopup("You are here");
-
-        // Style the user marker differently
-        const el = userMarkerRef.current.getElement();
-        if (el) {
-            el.style.filter = "hue-rotate(120deg)";
-        }
-
-        // Update markers array
-        markersRef.current = [
-            userMarkerRef.current,
-            ...markersRef.current.filter(marker => marker !== userMarkerRef.current)
-        ];
-
-        // Center map on user's location
-        mapInstanceRef.current.setView([location.latitude, location.longitude], 13);
     }, [location]);
 
     useEffect(() => {
@@ -241,10 +248,57 @@ const endMarker = leaflet.marker([endLocation.latitude, endLocation.longitude])
 
     return (
         <>
-            <div className="text-center p-2 bg-white shadow-md">
-                {!location && (
+            <div className="text-center p-2 bg-white shadow-md relative">
+                {/* Location button */}
+                <button
+                    onClick={() => {
+                        if (location) {
+                            centerOnCurrentLocation();
+                        } else if (locationError) {
+                            // Try again after error
+                            window.location.reload();
+                        } else {
+                            // Initial request
+                            centerOnCurrentLocation();
+                        }
+                    }}
+                    className="absolute left-4 top-4 bg-blue-500 text-white p-2 rounded-full z-[1000] shadow-md hover:bg-blue-600 transition-colors"
+                    title="Center on my location"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2a10 10 0 0 0-10 10 10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2"></path>
+                        <circle cx="12" cy="12" r="4"></circle>
+                    </svg>
+                </button>
+
+                {isLocationLoading && (
+                    <div className="bg-blue-100 border-blue-400 text-blue-700 px-4 py-3 rounded mb-2">
+                        <p>Detecting your location...</p>
+                    </div>
+                )}
+
+                {locationError && (
+                    <div className="bg-red-100 border-red-400 text-red-700 px-4 py-3 rounded mb-2">
+                        <p>Location Error: {locationError}</p>
+                        <p>Please enable location services in your browser settings and refresh the page.</p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="mt-2 bg-red-500 text-white px-3 py-1 rounded"
+                        >
+                            Refresh Page
+                        </button>
+                    </div>
+                )}
+
+                {!location && !locationError && !isLocationLoading && (
                     <div className="bg-yellow-100 border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-2">
-                        <p>Waiting for location access... Please enable geolocation in your browser settings.</p>
+                        <p>We need your permission to access your location</p>
+                        <button
+                            onClick={centerOnCurrentLocation}
+                            className="mt-2 bg-yellow-500 text-white px-3 py-1 rounded"
+                        >
+                            Allow Location Access
+                        </button>
                     </div>
                 )}
 
@@ -401,6 +455,37 @@ const endMarker = leaflet.marker([endLocation.latitude, endLocation.longitude])
                 ref={mapContainerRef}
                 className="h-[calc(100vh-56px)] w-[100%]"
             ></div>
+
+            <style>
+                {`
+                .user-location-marker {
+                    background: transparent;
+                    border: none;
+                }
+                .user-location-pulse {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 50%;
+                    background: #4285F4;
+                    box-shadow: 0 0 0 0 rgba(66, 133, 244, 1);
+                    animation: pulse 1.5s infinite;
+                }
+                @keyframes pulse {
+                    0% {
+                        transform: scale(0.95);
+                        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0.7);
+                    }
+                    70% {
+                        transform: scale(1.1);
+                        box-shadow: 0 0 0 10px rgba(66, 133, 244, 0);
+                    }
+                    100% {
+                        transform: scale(0.95);
+                        box-shadow: 0 0 0 0 rgba(66, 133, 244, 0);
+                    }
+                }
+                `}
+            </style>
         </>
     );
 };
