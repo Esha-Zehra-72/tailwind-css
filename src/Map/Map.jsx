@@ -22,8 +22,29 @@ const Map = () => {
     const [endSearchQuery, setEndSearchQuery] = useState('');
     const [startSearchResults, setStartSearchResults] = useState([]);
     const [endSearchResults, setEndSearchResults] = useState([]);
+    const [activeLayer, setActiveLayer] = useState('standard'); // Track active layer
 
     const { position: location, error: locationError, isLoading: isLocationLoading } = useGeolocation();
+
+    // Define map layers
+    const mapLayers = {
+        standard: leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        }),
+        satellite: leaflet.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19,
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+        }),
+        terrain: leaflet.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+        }),
+        dark: leaflet.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            maxZoom: 19
+        })
+    };
 
     const userIcon = leaflet.divIcon({
         className: 'user-location-marker',
@@ -68,6 +89,21 @@ const Map = () => {
             .addTo(mapInstanceRef.current)
             .bindPopup("You are here")
             .openPopup();
+    };
+
+    const changeLayer = (layerName) => {
+        if (!mapInstanceRef.current) return;
+
+        // Remove all layers
+        Object.values(mapLayers).forEach(layer => {
+            if (mapInstanceRef.current.hasLayer(layer)) {
+                mapInstanceRef.current.removeLayer(layer);
+            }
+        });
+
+        // Add the selected layer
+        mapLayers[layerName].addTo(mapInstanceRef.current);
+        setActiveLayer(layerName);
     };
 
     const handleSearch = async (e) => {
@@ -190,12 +226,9 @@ const Map = () => {
             15
         );
 
-        leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        }).addTo(mapInstanceRef.current);
+        // Add the default layer
+        mapLayers.standard.addTo(mapInstanceRef.current);
 
-        // Add existing markers from localStorage
         if (Array.isArray(nearMarkers)) {
             nearMarkers.forEach(({ latitude, longitude }) => {
                 const marker = leaflet.marker([latitude, longitude])
@@ -204,8 +237,6 @@ const Map = () => {
                 markersRef.current.push(marker);
             });
         }
-
-        // Click handler for adding new markers
         mapInstanceRef.current.on('click', (e) => {
             const { lat: latitude, lng: longitude } = e.latlng;
 
@@ -249,20 +280,17 @@ const Map = () => {
     return (
         <>
             <div className="text-center p-2 bg-white shadow-md relative">
-                {/* Location button */}
                 <button
                     onClick={() => {
                         if (location) {
                             centerOnCurrentLocation();
                         } else if (locationError) {
-                            // Try again after error
                             window.location.reload();
                         } else {
-                            // Initial request
                             centerOnCurrentLocation();
                         }
                     }}
-                    className="absolute left-4 top-4 bg-blue-500 text-white p-2 rounded-full z-[1000] shadow-md hover:bg-blue-600 transition-colors"
+                    className="absolute left-3 top-60 bg-blue-500 text-white p-2 rounded-full z-[1000] shadow-md hover:bg-blue-600 transition-colors"
                     title="Center on my location"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -270,6 +298,49 @@ const Map = () => {
                         <circle cx="12" cy="12" r="4"></circle>
                     </svg>
                 </button>
+
+                {/* Layer control buttons */}
+                <div className="absolute left-3 top-72 flex flex-col space-y-2 z-[1000]">
+                    <button
+                        onClick={() => changeLayer('standard')}
+                        className={`p-2 rounded-full shadow-md ${activeLayer === 'standard' ? 'bg-blue-500 text-white' : 'bg-white text-gray-800'}`}
+                        title="Standard Map"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 3H3v18h18V3z"></path>
+                            <path d="M9 9h6v6H9z"></path>
+                        </svg>
+                    </button>
+                    <button
+                        onClick={() => changeLayer('satellite')}
+                        className={`p-2 rounded-full shadow-md ${activeLayer === 'satellite' ? 'bg-blue-500 text-white' : 'bg-white text-gray-800'}`}
+                        title="Satellite View"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <circle cx="12" cy="12" r="2"></circle>
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                        </svg>
+                    </button>
+                    <button
+                        onClick={() => changeLayer('terrain')}
+                        className={`p-2 rounded-full shadow-md ${activeLayer === 'terrain' ? 'bg-blue-500 text-white' : 'bg-white text-gray-800'}`}
+                        title="Terrain View"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                        </svg>
+                    </button>
+                    <button
+                        onClick={() => changeLayer('dark')}
+                        className={`p-2 rounded-full shadow-md ${activeLayer === 'dark' ? 'bg-blue-500 text-white' : 'bg-white text-gray-800'}`}
+                        title="Dark Mode"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                </div>
 
                 {isLocationLoading && (
                     <div className="bg-blue-100 border-blue-400 text-blue-700 px-4 py-3 rounded mb-2">
