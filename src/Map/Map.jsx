@@ -22,11 +22,9 @@ const Map = () => {
     const [endSearchQuery, setEndSearchQuery] = useState('');
     const [startSearchResults, setStartSearchResults] = useState([]);
     const [endSearchResults, setEndSearchResults] = useState([]);
-    const [activeLayer, setActiveLayer] = useState('standard'); // Track active layer
+    const [activeLayer, setActiveLayer] = useState('standard');
 
     const { position: location, error: locationError, isLoading: isLocationLoading } = useGeolocation();
-
-    // Define map layers
     const mapLayers = {
         standard: leaflet.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
@@ -94,14 +92,12 @@ const Map = () => {
     const changeLayer = (layerName) => {
         if (!mapInstanceRef.current) return;
 
-        // Remove all layers
         Object.values(mapLayers).forEach(layer => {
             if (mapInstanceRef.current.hasLayer(layer)) {
                 mapInstanceRef.current.removeLayer(layer);
             }
         });
 
-        // Add the selected layer
         mapLayers[layerName].addTo(mapInstanceRef.current);
         setActiveLayer(layerName);
     };
@@ -225,8 +221,6 @@ const Map = () => {
             [31.448877, 74.204068],
             15
         );
-
-        // Add the default layer
         mapLayers.standard.addTo(mapInstanceRef.current);
 
         if (Array.isArray(nearMarkers)) {
@@ -251,7 +245,6 @@ const Map = () => {
                 { latitude, longitude }
             ]);
         });
-
         return () => {
             if (mapInstanceRef.current) {
                 mapInstanceRef.current.off();
@@ -298,8 +291,6 @@ const Map = () => {
                         <circle cx="12" cy="12" r="4"></circle>
                     </svg>
                 </button>
-
-                {/* Layer control buttons */}
                 <div className="absolute left-3 top-72 flex flex-col space-y-2 z-[1000]">
                     <button
                         onClick={() => changeLayer('standard')}
