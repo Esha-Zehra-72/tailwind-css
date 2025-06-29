@@ -5,6 +5,7 @@ import About from "./About";
 import Navbar from "./Navbar";
 import Success from "./Stripe/Success";
 import CheckoutButton from "./Stripe/CheckoutButton";
+import Slider from "./slider/Slider";
 // import Map from "./Map/Map"; // optional
 // import toast, { Toaster } from 'react-hot-toast';
 // import { useEffect } from "react";
@@ -45,6 +46,15 @@ const router = createBrowserRouter([
       <>
         <Navbar />
         <Success />
+      </>
+    ),
+  },
+  {
+    path: '/slider',
+    element: (
+      <>
+        <Navbar />
+        <Slider />
       </>
     ),
   },
